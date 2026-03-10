@@ -6,6 +6,7 @@ from playwright.sync_api import sync_playwright, TimeoutError as PlaywrightTimeo
 SITES = [
     "https://cinemadelacite.streamlit.app/",
     "https://byric-f-project-reco-movie-streamlit-app-3pm0kb.streamlit.app/",
+    "https://inseeprospectorcloud.streamlit.app/",
 ]
 
 # Mots-clés du bouton
