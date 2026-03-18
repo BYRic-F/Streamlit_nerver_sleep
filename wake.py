@@ -7,6 +7,7 @@ SITES = [
     "https://cinemadelacite.streamlit.app/",
     "https://byric-f-project-reco-movie-streamlit-app-3pm0kb.streamlit.app/",
     "https://inseeprospectorcloud.streamlit.app/",
+    "https://portfolio-f-bayen.streamlit.app/",
 ]
 
 # Mots-clés du bouton
