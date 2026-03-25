@@ -8,6 +8,7 @@ SITES = [
     "https://byric-f-project-reco-movie-streamlit-app-3pm0kb.streamlit.app/",
     "https://inseeprospectorcloud.streamlit.app/",
     "https://portfolio-f-bayen.streamlit.app/",
+    "https://appappentificator-nyglupew87ankibbekpltd.streamlit.app/",
 ]
 
 # Mots-clés du bouton (priorité à la phrase exacte)
