@@ -10,16 +10,14 @@ SITES = [
     "https://portfolio-f-bayen.streamlit.app/",
 ]
 
-# Mots-clés du bouton
+# Mots-clés du bouton (priorité à la phrase exacte)
 KEYWORDS = [
+    "Yes, get this app back up!",
     "yes",
     "get it",
     "back up",
     "wake",
     "start",
-    "run",
-    "launch",
-    "go",
 ]
 
 now_utc = datetime.now(timezone.utc)
@@ -30,47 +28,61 @@ print(f"Heure FR : {now_fr.strftime('%Y-%m-%d %H:%M:%S')}")
 
 with sync_playwright() as p:
     browser = p.chromium.launch(headless=True)
-    page = browser.new_page()
+    # Utiliser un user agent plus standard pour éviter d'être bloqué
+    context = browser.new_context(
+        user_agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
+    )
+    page = context.new_page()
 
     for url in SITES:
         print(f"\n Opening {url}")
 
         try:
-            page.goto(url, wait_until="domcontentloaded", timeout=180_000)
-
-            page.wait_for_timeout(8000)
+            # Attendre que le shell initial soit chargé
+            page.goto(url, wait_until="domcontentloaded", timeout=120_000)
+            # Attendre un peu que le JS de Streamlit détermine si l'app dort
+            page.wait_for_timeout(10000)
 
             clicked = False
 
-            # Trouver un bouton dont le nom matche un mot-clé
+            # On cherche le bouton dans la page ET dans les iframes
             for kw in KEYWORDS:
                 pattern = re.compile(rf".*{re.escape(kw)}.*", re.IGNORECASE)
-                btn = page.get_by_role("button", name=pattern)
+                
+                # Liste des locators à tester : page principale et iframes
+                locators = [
+                    page.get_by_role("button", name=pattern),
+                    page.frame_locator("iframe").get_by_role("button", name=pattern),
+                    page.get_by_text(pattern), # Fallback si pas role='button'
+                    page.frame_locator("iframe").get_by_text(pattern)
+                ]
 
-                if btn.count() > 0:
-                    # clique le premier bouton correspondant
-                    btn.first.click(timeout=30_000)
-                    print(f"Clicked button matching keyword: '{kw}'")
-                    clicked = True
+                for btn in locators:
+                    if btn.count() > 0:
+                        btn.first.click(timeout=30_000)
+                        print(f"Clicked button/text matching keyword: '{kw}'")
+                        clicked = True
+                        break
+                
+                if clicked:
                     break
 
-            # Si rien trouvé, clique le premier bouton visible
             if not clicked:
+                # Si rien trouvé, on tente un dernier recours sur n'importe quel bouton visible
                 any_btn = page.locator("button:visible").first
                 if any_btn.count() > 0:
-                    any_btn.click(timeout=30_000)
+                    any_btn.click(timeout=15_000)
                     print("Clicked first visible <button> (fallback)")
                     clicked = True
                 else:
-                    print("Aucun bouton visible trouvé (peut-être déjà awake ou UI différente).")
+                    print("Aucun bouton trouvé. L'application est peut-être déjà active.")
 
-            # Laisser le temps à Streamlit de rerun après clic
-            page.wait_for_timeout(6000)
-
+            # Laisser le temps à Streamlit de lancer le réveil
+            page.wait_for_timeout(5000)
             print("Done")
 
         except PlaywrightTimeoutError:
-            print("Timeout Playwright → cold start très probable / app lente")
+            print("Timeout Playwright → application très lente ou bloquée")
         except Exception as e:
             print(f"Erreur → {e}")
 
