@@ -5,11 +5,9 @@ from datetime import datetime, timezone
 from playwright.sync_api import sync_playwright, TimeoutError as PlaywrightTimeoutError
 
 SITES = [
-    "https://cinemadelacite.streamlit.app/",
     "https://byric-f-project-reco-movie-streamlit-app-3pm0kb.streamlit.app/",
     "https://inseeprospectorcloud.streamlit.app/",
     "https://portfolio-f-bayen.streamlit.app/",
-    "https://appappentificator-nyglupew87ankibbekpltd.streamlit.app/",
 ]
 
 # On simplifie les mots-clés pour être plus efficace
