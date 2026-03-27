@@ -1,6 +1,7 @@
 import re
+import time
+import random
 from datetime import datetime, timezone
-from zoneinfo import ZoneInfo
 from playwright.sync_api import sync_playwright, TimeoutError as PlaywrightTimeoutError
 
 SITES = [
@@ -11,80 +12,65 @@ SITES = [
     "https://appappentificator-nyglupew87ankibbekpltd.streamlit.app/",
 ]
 
-# Mots-clés du bouton (priorité à la phrase exacte)
-KEYWORDS = [
-    "Yes, get this app back up!",
-    "yes",
-    "get it",
-    "back up",
-    "wake",
-    "start",
-]
+# On simplifie les mots-clés pour être plus efficace
+KEYWORDS = ["Yes, get this app back up!", "Wake up"]
 
-now_utc = datetime.now(timezone.utc)
-print(f"Wake Streamlit — {now_utc.isoformat()}")
+def run_wake():
+    now_utc = datetime.now(timezone.utc)
+    print(f"--- Execution: {now_utc.strftime('%Y-%m-%d %H:%M:%S')} UTC ---")
 
-now_fr = now_utc.astimezone(ZoneInfo("Europe/Paris"))
-print(f"Heure FR : {now_fr.strftime('%Y-%m-%d %H:%M:%S')}")
+    # Anti-bot : Attente aléatoire entre 1 et 30 secondes avant de commencer
+    wait_start = random.randint(1, 30)
+    print(f"Waiting {wait_start}s to simulate human behavior...")
+    time.sleep(wait_start)
 
-with sync_playwright() as p:
-    browser = p.chromium.launch(headless=True)
-    # Utiliser un user agent plus standard pour éviter d'être bloqué
-    context = browser.new_context(
-        user_agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
-    )
-    page = context.new_page()
+    with sync_playwright() as p:
+        # Launch avec des arguments pour éviter la détection
+        browser = p.chromium.launch(headless=True)
+        context = browser.new_context(
+            user_agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36",
+            viewport={'width': 1280, 'height': 720}
+        )
+        page = context.new_page()
 
-    for url in SITES:
-        print(f"\n Opening {url}")
-
-        try:
-            # Attendre que le shell initial soit chargé
-            page.goto(url, wait_until="domcontentloaded", timeout=120_000)
-            # Attendre un peu que le JS de Streamlit détermine si l'app dort
-            page.wait_for_timeout(10000)
-
-            clicked = False
-
-            # On cherche le bouton dans la page ET dans les iframes
-            for kw in KEYWORDS:
-                pattern = re.compile(rf".*{re.escape(kw)}.*", re.IGNORECASE)
+        for url in SITES:
+            print(f"Checking: {url}")
+            try:
+                # On charge la page
+                page.goto(url, wait_until="networkidle", timeout=60000)
                 
-                # Liste des locators à tester : page principale et iframes
-                locators = [
-                    page.get_by_role("button", name=pattern),
-                    page.frame_locator("iframe").get_by_role("button", name=pattern),
-                    page.get_by_text(pattern), # Fallback si pas role='button'
-                    page.frame_locator("iframe").get_by_text(pattern)
-                ]
+                # Petit temps pour laisser le bouton apparaître si besoin
+                page.wait_for_timeout(5000)
 
-                for btn in locators:
-                    if btn.count() > 0:
-                        btn.first.click(timeout=30_000)
-                        print(f"Clicked button/text matching keyword: '{kw}'")
+                clicked = False
+                # Tentative de clic sur le bouton spécifique
+                for kw in KEYWORDS:
+                    # On cherche dans le document principal et les iframes
+                    btn = page.get_by_role("button", name=re.compile(kw, re.I)).first
+                    if btn.is_visible():
+                        btn.click()
+                        print(f"  [WAKE] Clicked '{kw}'")
                         clicked = True
                         break
                 
-                if clicked:
-                    break
+                if not clicked:
+                    # Si aucun bouton de réveil, on vérifie si l'app est déjà chargée
+                    # (On cherche un élément typique de Streamlit comme la barre de menu)
+                    if page.locator('button[kind="headerNoPadding"]').is_visible() or page.locator('.stApp').is_visible():
+                        print("  [OK] App is already awake.")
+                    else:
+                        print("  [?] No wake button found, but app state unknown.")
 
-            if not clicked:
-                # Si rien trouvé, on tente un dernier recours sur n'importe quel bouton visible
-                any_btn = page.locator("button:visible").first
-                if any_btn.count() > 0:
-                    any_btn.click(timeout=15_000)
-                    print("Clicked first visible <button> (fallback)")
-                    clicked = True
-                else:
-                    print("Aucun bouton trouvé. L'application est peut-être déjà active.")
+                # On attend un peu pour valider le réveil avant de passer à la suivante
+                page.wait_for_timeout(3000)
 
-            # Laisser le temps à Streamlit de lancer le réveil
-            page.wait_for_timeout(5000)
-            print("Done")
+            except PlaywrightTimeoutError:
+                print(f"  [TIMEOUT] {url} is taking too long.")
+            except Exception as e:
+                print(f"  [ERROR] {e}")
 
-        except PlaywrightTimeoutError:
-            print("Timeout Playwright → application très lente ou bloquée")
-        except Exception as e:
-            print(f"Erreur → {e}")
+        browser.close()
+    print("--- Finished ---\n")
 
-    browser.close()
+if __name__ == "__main__":
+    run_wake()
