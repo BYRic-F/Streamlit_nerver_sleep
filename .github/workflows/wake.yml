@@ -2,13 +2,15 @@ name: Wake Streamlit Apps
 
 on:
   schedule:
-    - cron: "0 2 * 3-10 *"
-    - cron: "0 3 * 11,12,1,2 *"
-  workflow_dispatch:
+    - cron: "0 * * * *"
+  workflow_dispatch: 
 
 jobs:
   wake:
     runs-on: ubuntu-latest
+    concurrency: 
+      group: wake-apps
+      cancel-in-progress: true
 
     steps:
       - name: Checkout repository
@@ -18,13 +20,13 @@ jobs:
         uses: actions/setup-python@v5
         with:
           python-version: "3.11"
+          # Utilise le cache pour accélérer l'installation
+          cache: 'pip'
 
       - name: Install dependencies
         run: |
           pip install playwright
-          # On installe le navigateur et ses dépendances système
           python -m playwright install chromium --with-deps
 
       - name: Run wake script
-        run: |
-          python wake.py
+        run: python wake.py
